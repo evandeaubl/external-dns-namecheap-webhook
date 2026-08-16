@@ -353,6 +353,34 @@ func TestXMLParsing_SetHostsResult(t *testing.T) {
 	}
 }
 
+func TestNewNamecheapClient_DefaultUsername(t *testing.T) {
+	cfg := &Config{
+		APIUser:  "myapiuser",
+		APIKey:   "mykey",
+		Username: "",
+		ClientIP: "1.2.3.4",
+	}
+
+	client := NewNamecheapClient(cfg)
+	if client.username != "myapiuser" {
+		t.Errorf("expected username to default to APIUser 'myapiuser', got %q", client.username)
+	}
+}
+
+func TestNewNamecheapClient_ExplicitUsername(t *testing.T) {
+	cfg := &Config{
+		APIUser:  "myapiuser",
+		APIKey:   "mykey",
+		Username: "otheruser",
+		ClientIP: "1.2.3.4",
+	}
+
+	client := NewNamecheapClient(cfg)
+	if client.username != "otheruser" {
+		t.Errorf("expected username to be 'otheruser', got %q", client.username)
+	}
+}
+
 func TestXMLParsing_NcErrors(t *testing.T) {
 	xmlData := `<Errors>
     <Error Number="1010101">Parameter APIUser is missing</Error>

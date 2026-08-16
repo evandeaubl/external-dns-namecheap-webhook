@@ -50,8 +50,8 @@ page:
 |----------------------------|-----------------------------------------------------------------------------|
 | `NAMECHEAP_API_USER`       | Your Namecheap API user name (usually your Namecheap account name).        |
 | `NAMECHEAP_API_KEY`        | Your Namecheap API key.                                                    |
-| `NAMECHEAP_USERNAME`       | Your Namecheap username.                                                   |
-| `NAMECHEAP_CLIENT_IP`      | The public IP address whitelisted in your Namecheap API access settings.   |
+| `NAMECHEAP_USERNAME`       | Your Namecheap username (defaults to `NAMECHEAP_API_USER`).                |
+| `NAMECHEAP_CLIENT_IP`      | The public IP address whitelisted in your Namecheap API access settings (optional). |
 
 ### Environment variables and flags
 
@@ -62,8 +62,8 @@ marked with **(env only)** can only be passed via environment variables.
 |-------------------------|---------------------------|--------------------------------------|-----------------------------------------------------------------------------|
 | `--api-user`            | `NAMECHEAP_API_USER`      | *(required)*                         | Namecheap API user **(env only)**.                                          |
 | `--api-key`             | `NAMECHEAP_API_KEY`       | *(required)*                         | Namecheap API key **(env only)**.                                           |
-| `--username`            | `NAMECHEAP_USERNAME`      | *(required)*                         | Namecheap username **(env only)**.                                          |
-| `--client-ip`           | `NAMECHEAP_CLIENT_IP`     | *(required)*                         | Client IP for Namecheap API **(env only)**.                                 |
+| `--username`            | `NAMECHEAP_USERNAME`      | *(api-user)*                         | Namecheap username, defaults to api-user **(env only)**.                    |
+| `--client-ip`           | `NAMECHEAP_CLIENT_IP`     | *(none)*                             | Client IP for Namecheap API (optional).                                     |
 | `--production`          | `NAMECHEAP_PRODUCTION`    | `false`                              | Use the Namecheap production API instead of the sandbox.                    |
 | `--domain-filter`       | `NAMECHEAP_DOMAIN_FILTER` | *(none)*                             | Comma-separated list of domains to manage.                                  |
 | `--listen-address`      | `LISTEN_ADDRESS`          | `:8888`                              | Address for the webhook server (listen on `localhost` in production).        |
@@ -90,6 +90,8 @@ docker run --rm \
   namecheap-webhook:latest
 ```
 
+`NAMECHEAP_USERNAME` defaults to `NAMECHEAP_API_USER` and `NAMECHEAP_CLIENT_IP` is optional.
+
 ## Kubernetes deployment
 
 ### Prerequisites
@@ -105,8 +107,8 @@ type: Opaque
 stringData:
   NAMECHEAP_API_USER: "your-api-user"
   NAMECHEAP_API_KEY: "your-api-key"
-  NAMECHEAP_USERNAME: "your-username"
-  NAMECHEAP_CLIENT_IP: "your-whitelisted-ip"
+  NAMECHEAP_USERNAME: "your-username"   # optional, defaults to NAMECHEAP_API_USER
+  NAMECHEAP_CLIENT_IP: "your-whitelisted-ip"  # optional
 ```
 
 2. Build and push the container image to your registry (or use the pre-built

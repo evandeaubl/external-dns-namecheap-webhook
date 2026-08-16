@@ -140,6 +140,11 @@ type SetHostsResultInner struct {
 }
 
 func NewNamecheapClient(cfg *Config) *NamecheapClient {
+	username := cfg.Username
+	if username == "" {
+		username = cfg.APIUser
+	}
+
 	return &NamecheapClient{
 		httpClient: &http.Client{
 			Timeout: cfg.RequestTTL,
@@ -147,7 +152,7 @@ func NewNamecheapClient(cfg *Config) *NamecheapClient {
 		baseURL:  cfg.APIURL(),
 		apiUser:  cfg.APIUser,
 		apiKey:   cfg.APIKey,
-		username: cfg.Username,
+		username: username,
 		clientIP: cfg.ClientIP,
 	}
 }

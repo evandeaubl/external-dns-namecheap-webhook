@@ -34,7 +34,7 @@ func ParseFlags() *Config {
 	flag.StringVar(&cfg.APIUser, "api-user", "", "Namecheap API user (env: NAMECHEAP_API_USER)")
 	flag.StringVar(&cfg.APIKey, "api-key", "", "Namecheap API key (env: NAMECHEAP_API_KEY)")
 	flag.StringVar(&cfg.Username, "username", "", "Namecheap username (env: NAMECHEAP_USERNAME, defaults to api-user)")
-	flag.StringVar(&cfg.ClientIP, "client-ip", "", "Client IP for Namecheap API (env: NAMECHEAP_CLIENT_IP, optional)")
+	flag.StringVar(&cfg.ClientIP, "client-ip", "", "Client IP for Namecheap API (env: NAMECHEAP_CLIENT_IP)")
 	flag.BoolVar(&cfg.Production, "production", false, "Use Namecheap production environment (default: sandbox) (env: NAMECHEAP_PRODUCTION)")
 	flag.Var((*stringSliceFlag)(&cfg.DomainFilters), "domain-filter", "Comma-separated list of domain filters (env: NAMECHEAP_DOMAIN_FILTER)")
 	flag.StringVar(&cfg.ListenAddr, "listen-address", DefaultWebhookPort, "Address to listen on for webhook server (env: LISTEN_ADDRESS)")

@@ -358,7 +358,6 @@ func TestNewNamecheapClient_DefaultUsername(t *testing.T) {
 		APIUser:  "myapiuser",
 		APIKey:   "mykey",
 		Username: "",
-		ClientIP: "1.2.3.4",
 	}
 
 	client := NewNamecheapClient(cfg)
@@ -372,12 +371,37 @@ func TestNewNamecheapClient_ExplicitUsername(t *testing.T) {
 		APIUser:  "myapiuser",
 		APIKey:   "mykey",
 		Username: "otheruser",
-		ClientIP: "1.2.3.4",
 	}
 
 	client := NewNamecheapClient(cfg)
 	if client.username != "otheruser" {
 		t.Errorf("expected username to be 'otheruser', got %q", client.username)
+	}
+}
+
+func TestNewNamecheapClient_DefaultClientIP(t *testing.T) {
+	cfg := &Config{
+		APIUser:  "myapiuser",
+		APIKey:   "mykey",
+		ClientIP: "",
+	}
+
+	client := NewNamecheapClient(cfg)
+	if client.clientIP != "127.0.0.1" {
+		t.Errorf("expected clientIP to default to 127.0.0.1, got %q", client.clientIP)
+	}
+}
+
+func TestNewNamecheapClient_ExplicitClientIP(t *testing.T) {
+	cfg := &Config{
+		APIUser:  "myapiuser",
+		APIKey:   "mykey",
+		ClientIP: "5.6.7.8",
+	}
+
+	client := NewNamecheapClient(cfg)
+	if client.clientIP != "5.6.7.8" {
+		t.Errorf("expected clientIP to be 5.6.7.8, got %q", client.clientIP)
 	}
 }
 

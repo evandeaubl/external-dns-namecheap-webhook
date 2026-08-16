@@ -145,6 +145,11 @@ func NewNamecheapClient(cfg *Config) *NamecheapClient {
 		username = cfg.APIUser
 	}
 
+	clientIP := cfg.ClientIP
+	if clientIP == "" {
+		clientIP = "127.0.0.1"
+	}
+
 	return &NamecheapClient{
 		httpClient: &http.Client{
 			Timeout: cfg.RequestTTL,
@@ -153,7 +158,7 @@ func NewNamecheapClient(cfg *Config) *NamecheapClient {
 		apiUser:  cfg.APIUser,
 		apiKey:   cfg.APIKey,
 		username: username,
-		clientIP: cfg.ClientIP,
+		clientIP: clientIP,
 	}
 }
 

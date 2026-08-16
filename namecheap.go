@@ -58,9 +58,9 @@ func (e *NcErrors) Error() string {
 }
 
 type DomainsList struct {
-	XMLName xml.Name `xml:"CommandResponse"`
+	XMLName xml.Name          `xml:"CommandResponse"`
 	Result  DomainsListResult `xml:"DomainGetListResult"`
-	Paging  Paging `xml:"Paging"`
+	Paging  Paging            `xml:"Paging"`
 }
 
 type DomainsListResult struct {
@@ -121,7 +121,7 @@ type Host struct {
 }
 
 type SetHostsResult struct {
-	XMLName xml.Name          `xml:"CommandResponse"`
+	XMLName xml.Name            `xml:"CommandResponse"`
 	Result  SetHostsResultInner `xml:"DomainDNSSetHostsResult"`
 }
 

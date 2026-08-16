@@ -108,7 +108,7 @@ type HostsResult struct {
 type HostsResultInner struct {
 	Domain        string `xml:"Domain,attr"`
 	IsUsingOurDNS string `xml:"IsUsingOurDNS,attr"`
-	Hosts         []Host `xml:"Host"`
+	Hosts         []Host `xml:"host"`
 }
 
 type Host struct {

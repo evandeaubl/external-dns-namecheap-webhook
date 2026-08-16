@@ -134,9 +134,9 @@ func TestNamecheapClient_GetHosts(t *testing.T) {
   <Errors />
   <CommandResponse Type="namecheap.domains.dns.getHosts">
     <DomainDNSGetHostsResult Domain="example.com" IsUsingOurDNS="true">
-      <Host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
-      <Host HostId="2" Name="www" Type="A" Address="122.23.3.7" MXPref="10" TTL="1800" />
-      <Host HostId="3" Name="@" Type="MX" Address="mail.example.com" MXPref="10" TTL="3600" />
+      <host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
+      <host HostId="2" Name="www" Type="A" Address="122.23.3.7" MXPref="10" TTL="1800" />
+      <host HostId="3" Name="@" Type="MX" Address="mail.example.com" MXPref="10" TTL="3600" />
     </DomainDNSGetHostsResult>
   </CommandResponse>
   <Server>TestServer</Server>
@@ -312,8 +312,8 @@ func TestXMLParsing_TldList(t *testing.T) {
 
 func TestXMLParsing_HostsResult(t *testing.T) {
 	xmlData := `<DomainDNSGetHostsResult Domain="example.com" IsUsingOurDNS="true">
-      <Host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
-      <Host HostId="2" Name="www" Type="CNAME" Address="target.example.org" TTL="3600" />
+      <host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
+      <host HostId="2" Name="www" Type="CNAME" Address="target.example.org" TTL="3600" />
     </DomainDNSGetHostsResult>`
 
 	var hostsResult HostsResult

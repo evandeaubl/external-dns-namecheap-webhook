@@ -21,6 +21,15 @@ type NamecheapClient struct {
 	tldSet     map[string]bool
 }
 
+type DNSProvider interface {
+	GetDomains() ([]Domain, error)
+	GetHosts(sld, tld string) ([]Host, error)
+	SetHosts(sld, tld string, hosts []Host) error
+	SplitDomain(domain string) (string, string, string)
+	TLDs() []string
+	TLDCount() int
+}
+
 type ncError struct {
 	Number  string `xml:"Number,attr"`
 	Message string `xml:",chardata"`

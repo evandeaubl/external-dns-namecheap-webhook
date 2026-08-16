@@ -18,7 +18,7 @@ const (
 )
 
 type Server struct {
-	client    *NamecheapClient
+	client    DNSProvider
 	cfg       *Config
 	startedAt time.Time
 }
@@ -137,7 +137,12 @@ func (s *Server) getRecords(ctx context.Context) ([]*Endpoint, error) {
 		return nil, fmt.Errorf("failed to list domains: %w", err)
 	}
 
-	allEndpoints := []*Endpoint{}
+	type endpointKey struct {
+		dnsName    string
+		recordType string
+	}
+
+	endpointMap := make(map[string]*Endpoint)
 
 	for _, domain := range domains {
 		if !s.cfg.DomainFilterMatch(domain.Name) {
@@ -157,10 +162,25 @@ func (s *Server) getRecords(ctx context.Context) ([]*Endpoint, error) {
 
 		for _, host := range hosts {
 			ep := s.hostToEndpoint(host, domain.Name)
-			if ep != nil {
-				allEndpoints = append(allEndpoints, ep)
+			if ep == nil {
+				continue
 			}
+
+			key := endpointKey{dnsName: ep.DNSName, recordType: ep.RecordType}
+			keyStr := fmt.Sprintf("%s|%s", key.dnsName, key.recordType)
+
+			if existing, ok := endpointMap[keyStr]; ok {
+				existing.Targets = append(existing.Targets, ep.Targets...)
+				continue
+			}
+
+			endpointMap[keyStr] = ep
 		}
+	}
+
+	allEndpoints := []*Endpoint{}
+	for _, ep := range endpointMap {
+		allEndpoints = append(allEndpoints, ep)
 	}
 
 	return allEndpoints, nil
@@ -308,20 +328,17 @@ func (s *Server) applyChangesForDomain(ctx context.Context, domainName string, d
 		return fmt.Errorf("failed to get current hosts: %w", err)
 	}
 
-	hostMap := make(map[string]map[string]*Host)
+	hostMap := make(map[string][]*Host)
 	for i := range currentHosts {
 		h := &currentHosts[i]
-		if hostMap[h.Name] == nil {
-			hostMap[h.Name] = make(map[string]*Host)
-		}
-		hostMap[h.Name][h.Type] = h
+		hostMap[h.Name] = append(hostMap[h.Name], h)
 	}
 
 	for _, ep := range dc.updateOld {
-		s.removeEndpointFromHosts(hostMap, ep, domainName)
+		s.removeAllEndpointsFromHosts(hostMap, ep, domainName)
 	}
 	for _, ep := range dc.delete {
-		s.removeEndpointFromHosts(hostMap, ep, domainName)
+		s.removeAllEndpointsFromHosts(hostMap, ep, domainName)
 	}
 	for _, ep := range dc.create {
 		s.applyEndpointToHosts(hostMap, ep, domainName)
@@ -331,8 +348,8 @@ func (s *Server) applyChangesForDomain(ctx context.Context, domainName string, d
 	}
 
 	var finalHosts []Host
-	for name, byType := range hostMap {
-		for _, h := range byType {
+	for name, hosts := range hostMap {
+		for _, h := range hosts {
 			h.Name = name
 			finalHosts = append(finalHosts, *h)
 		}
@@ -352,7 +369,7 @@ func (s *Server) applyChangesForDomain(ctx context.Context, domainName string, d
 	return nil
 }
 
-func (s *Server) applyEndpointToHosts(hostMap map[string]map[string]*Host, ep *Endpoint, domainName string) {
+func (s *Server) applyEndpointToHosts(hostMap map[string][]*Host, ep *Endpoint, domainName string) {
 	hostname := s.endpointHostname(ep.DNSName, domainName)
 	recordType := strings.ToUpper(ep.RecordType)
 
@@ -367,44 +384,85 @@ func (s *Server) applyEndpointToHosts(hostMap map[string]map[string]*Host, ep *E
 		ttl = maxTTL
 	}
 
-	host := &Host{
-		Name:    hostname,
-		Type:    recordType,
-		TTL:     fmt.Sprintf("%d", ttl),
-	}
-
 	switch recordType {
 	case "MX":
 		targets := ep.Targets
 		if len(targets) > 0 {
-			parts := strings.SplitN(targets[0], " ", 2)
-			if len(parts) == 2 {
-				host.MXPref = parts[0]
-				host.Address = parts[1]
-			} else {
-				host.Address = targets[0]
+			for _, target := range targets {
+				h := &Host{
+					Name: hostname,
+					Type: recordType,
+					TTL:  fmt.Sprintf("%d", ttl),
+				}
+				parts := strings.SplitN(target, " ", 2)
+				if len(parts) == 2 {
+					h.MXPref = parts[0]
+					h.Address = parts[1]
+				} else {
+					h.Address = target
+				}
+				hostMap[hostname] = append(hostMap[hostname], h)
 			}
 		}
 	case "A", "AAAA", "CNAME", "TXT", "NS":
-		if len(ep.Targets) > 0 {
-			host.Address = ep.Targets[0]
+		targets := ep.Targets
+		if len(targets) > 0 {
+			for _, target := range targets {
+				h := &Host{
+					Name:    hostname,
+					Type:    recordType,
+					Address: target,
+					TTL:     fmt.Sprintf("%d", ttl),
+				}
+				hostMap[hostname] = append(hostMap[hostname], h)
+			}
 		}
 	default:
 		return
 	}
-
-	if hostMap[hostname] == nil {
-		hostMap[hostname] = make(map[string]*Host)
-	}
-	hostMap[hostname][recordType] = host
 }
 
-func (s *Server) removeEndpointFromHosts(hostMap map[string]map[string]*Host, ep *Endpoint, domainName string) {
+func (s *Server) removeEndpointFromHosts(hostMap map[string][]*Host, ep *Endpoint, domainName string) {
 	hostname := s.endpointHostname(ep.DNSName, domainName)
 	recordType := strings.ToUpper(ep.RecordType)
-	if byType, ok := hostMap[hostname]; ok {
-		delete(byType, recordType)
+	hosts, ok := hostMap[hostname]
+	if !ok {
+		return
 	}
+	for i, h := range hosts {
+		if h.Type == recordType {
+			if len(ep.Targets) > 0 {
+				matched := false
+				for _, target := range ep.Targets {
+					if h.Address == target {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					continue
+				}
+			}
+			hostMap[hostname] = append(hosts[:i], hosts[i+1:]...)
+			break
+		}
+	}
+}
+
+func (s *Server) removeAllEndpointsFromHosts(hostMap map[string][]*Host, ep *Endpoint, domainName string) {
+	hostname := s.endpointHostname(ep.DNSName, domainName)
+	recordType := strings.ToUpper(ep.RecordType)
+	hosts, ok := hostMap[hostname]
+	if !ok {
+		return
+	}
+	var filtered []*Host
+	for _, h := range hosts {
+		if h.Type != recordType {
+			filtered = append(filtered, h)
+		}
+	}
+	hostMap[hostname] = filtered
 }
 
 func (s *Server) endpointHostname(dnsName, domainName string) string {

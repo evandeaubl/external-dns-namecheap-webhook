@@ -23,6 +23,11 @@ code. It is for your private use for testing the API only.
 You are to test ONLY against the sandbox environment, NEVER against the
 production environment.
 
+Commit messages should use the Conventional Commits commit message
+convention. That standard is available at
+<https://www.conventionalcommits.org> if you do not have knowledge about
+it.
+
 # Web documentation
 
 Documentation for the webhook provider interface is available at

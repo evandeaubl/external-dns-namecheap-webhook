@@ -49,7 +49,7 @@ func TestNamecheapClient_FetchTLDList(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml")
-		fmt.Fprint(w, xmlResponse)
+		_, _ = fmt.Fprint(w, xmlResponse)
 	}))
 	defer server.Close()
 
@@ -105,7 +105,7 @@ func TestNamecheapClient_GetDomains(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml")
-		fmt.Fprint(w, xmlResponse)
+		_, _ = fmt.Fprint(w, xmlResponse)
 	}))
 	defer server.Close()
 
@@ -146,7 +146,7 @@ func TestNamecheapClient_GetHosts(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml")
-		fmt.Fprint(w, xmlResponse)
+		_, _ = fmt.Fprint(w, xmlResponse)
 	}))
 	defer server.Close()
 
@@ -177,7 +177,7 @@ func TestNamecheapClient_SetHosts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedParams = r.URL.Query()
 		w.Header().Set("Content-Type", "text/xml")
-		fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?>
+		_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?>
 <ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
   <Errors />
   <CommandResponse Type="namecheap.domains.dns.setHosts">
@@ -239,7 +239,7 @@ func TestNamecheapClient_APIError(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/xml")
-		fmt.Fprint(w, xmlResponse)
+		_, _ = fmt.Fprint(w, xmlResponse)
 	}))
 	defer server.Close()
 
@@ -257,7 +257,7 @@ func TestNamecheapClient_APIError(t *testing.T) {
 func TestNamecheapClient_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Internal Server Error")
+		_, _ = fmt.Fprint(w, "Internal Server Error")
 	}))
 	defer server.Close()
 

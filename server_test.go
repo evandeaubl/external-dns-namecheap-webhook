@@ -780,7 +780,7 @@ func TestEnvOrFlag(t *testing.T) {
 
 	t.Run("empty env", func(t *testing.T) {
 		t.Setenv("TEST_EMPTY", "")
-		var target string = "original"
+		target := "original"
 		envOrFlag("TEST_EMPTY", &target)
 		if target != "original" {
 			t.Errorf("expected original, got %q", target)

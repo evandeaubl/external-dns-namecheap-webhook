@@ -124,11 +124,13 @@ func (s *Server) AdjustEndpointsHandler(w http.ResponseWriter, r *http.Request) 
 func (s *Server) HealthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":     "ok",
 		"started_at": s.startedAt.Format(time.RFC3339),
 		"tld_count":  s.client.TLDCount(),
-	})
+	}); err != nil {
+		log.Printf("failed to encode health response: %v", err)
+	}
 }
 
 func (s *Server) getRecords(ctx context.Context) ([]*Endpoint, error) {

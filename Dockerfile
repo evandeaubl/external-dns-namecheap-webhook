@@ -6,7 +6,7 @@ COPY go.mod ./
 COPY cmd/ ./cmd/
 COPY *.go ./
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/namecheap-webhook ./cmd/namecheap-webhook
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/namecheap-webhook ./cmd/namecheap-webhook
 
 FROM gcr.io/distroless/static-debian12:nonroot
 

@@ -232,7 +232,9 @@ func (c *NamecheapClient) GetDomains() ([]Domain, error) {
 	c.mu.RUnlock()
 
 	if cached.isValid() {
-		return cached.entries, nil
+		entries := make([]Domain, len(cached.entries))
+		copy(entries, cached.entries)
+		return entries, nil
 	}
 
 	params := url.Values{}
@@ -268,7 +270,9 @@ func (c *NamecheapClient) GetHosts(sld, tld string) ([]Host, error) {
 	c.mu.RUnlock()
 
 	if ok && cached.isValid() {
-		return cached.entries, nil
+		entries := make([]Host, len(cached.entries))
+		copy(entries, cached.entries)
+		return entries, nil
 	}
 
 	params := url.Values{}

@@ -797,6 +797,7 @@ func (m *mockClient) Init() error                                              {
 func (m *mockClient) GetDomains() ([]Domain, error)                            { return m.domains, nil }
 func (m *mockClient) GetHosts(sld, tld string) ([]Host, error)                 { key := sld + "." + tld; return m.hosts[key], nil }
 func (m *mockClient) SetHosts(sld, tld string, hosts []Host) error { key := sld + "." + tld; m.hosts[key] = hosts; return nil }
+func (m *mockClient) InvalidateHostsCache(sld, tld string)                     {}
 func (m *mockClient) SplitDomain(domain string) (string, string, string)       { return "example", "com", "@" }
 func (m *mockClient) TLDs() []string                                           { return []string{"com"} }
 func (m *mockClient) TLDCount() int                                            { return 1 }

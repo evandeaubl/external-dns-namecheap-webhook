@@ -9,23 +9,27 @@ import (
 )
 
 const (
-	DefaultWebhookPort   = ":8888"
-	DefaultHealthzPort   = ":8080"
-	DefaultSandboxURL    = "https://api.sandbox.namecheap.com/xml.response"
-	DefaultProductionURL = "https://api.namecheap.com/xml.response"
-	DefaultRequestTTL    = 60 * time.Second
+	DefaultWebhookPort     = ":8888"
+	DefaultHealthzPort     = ":8080"
+	DefaultSandboxURL      = "https://api.sandbox.namecheap.com/xml.response"
+	DefaultProductionURL   = "https://api.namecheap.com/xml.response"
+	DefaultRequestTTL      = 60 * time.Second
+	DefaultDomainCacheTTL  = 2 * time.Hour
+	DefaultHostsCacheTTL   = 10 * time.Minute
 )
 
 type Config struct {
-	APIUser      string
-	APIKey       string
-	Username     string
-	ClientIP     string
-	Production   bool
-	DomainFilters []string
-	ListenAddr   string
-	HealthzAddr  string
-	RequestTTL   time.Duration
+	APIUser        string
+	APIKey         string
+	Username       string
+	ClientIP       string
+	Production     bool
+	DomainFilters  []string
+	ListenAddr     string
+	HealthzAddr    string
+	RequestTTL     time.Duration
+	DomainCacheTTL time.Duration
+	HostsCacheTTL  time.Duration
 }
 
 func ParseFlags() *Config {
@@ -40,6 +44,8 @@ func ParseFlags() *Config {
 	flag.StringVar(&cfg.ListenAddr, "listen-address", DefaultWebhookPort, "Address to listen on for webhook server (env: LISTEN_ADDRESS)")
 	flag.StringVar(&cfg.HealthzAddr, "healthz-address", DefaultHealthzPort, "Address to listen on for health/metrics server (env: HEALTHZ_ADDRESS)")
 	flag.DurationVar(&cfg.RequestTTL, "request-ttl", DefaultRequestTTL, "Timeout for Namecheap API requests (env: REQUEST_TTL)")
+	flag.DurationVar(&cfg.DomainCacheTTL, "domain-cache-ttl", DefaultDomainCacheTTL, "Cache TTL for domain list (env: DOMAIN_CACHE_TTL)")
+	flag.DurationVar(&cfg.HostsCacheTTL, "hosts-cache-ttl", DefaultHostsCacheTTL, "Cache TTL for host records (env: HOSTS_CACHE_TTL)")
 
 	flag.Parse()
 
@@ -52,6 +58,8 @@ func ParseFlags() *Config {
 	envOrFlag("LISTEN_ADDRESS", &cfg.ListenAddr)
 	envOrFlag("HEALTHZ_ADDRESS", &cfg.HealthzAddr)
 	envOrFlag("REQUEST_TTL", &cfg.RequestTTL)
+	envOrFlag("DOMAIN_CACHE_TTL", &cfg.DomainCacheTTL)
+	envOrFlag("HOSTS_CACHE_TTL", &cfg.HostsCacheTTL)
 
 	return cfg
 }
@@ -111,6 +119,13 @@ func (c *Config) Validate() error {
 	}
 	if c.APIKey == "" {
 		return fmt.Errorf("api-key is required (set via --api-key or NAMECHEAP_API_KEY env var)")
+	}
+
+	if c.DomainCacheTTL <= 0 {
+		c.DomainCacheTTL = DefaultDomainCacheTTL
+	}
+	if c.HostsCacheTTL <= 0 {
+		c.HostsCacheTTL = DefaultHostsCacheTTL
 	}
 
 	return nil

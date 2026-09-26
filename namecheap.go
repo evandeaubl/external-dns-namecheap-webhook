@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 type NamecheapClient struct {
@@ -20,12 +22,38 @@ type NamecheapClient struct {
 	clientIP   string
 	tlds       []string
 	tldSet     map[string]bool
+
+	domainCacheTTL time.Duration
+	hostsCacheTTL  time.Duration
+
+	mu          sync.RWMutex
+	domains     cachedDomains
+	hostsCache  map[string]cachedHosts
+}
+
+type cachedDomains struct {
+	entries []Domain
+	expiry  time.Time
+}
+
+type cachedHosts struct {
+	entries []Host
+	expiry  time.Time
+}
+
+func (c *cachedDomains) isValid() bool {
+	return time.Now().Before(c.expiry)
+}
+
+func (c *cachedHosts) isValid() bool {
+	return time.Now().Before(c.expiry)
 }
 
 type DNSProvider interface {
 	GetDomains() ([]Domain, error)
 	GetHosts(sld, tld string) ([]Host, error)
 	SetHosts(sld, tld string, hosts []Host) error
+	InvalidateHostsCache(sld, tld string)
 	SplitDomain(domain string) (string, string, string)
 	TLDs() []string
 	TLDCount() int
@@ -155,11 +183,14 @@ func NewNamecheapClient(cfg *Config) *NamecheapClient {
 		httpClient: &http.Client{
 			Timeout: cfg.RequestTTL,
 		},
-		baseURL:  cfg.APIURL(),
-		apiUser:  cfg.APIUser,
-		apiKey:   cfg.APIKey,
-		username: username,
-		clientIP: clientIP,
+		baseURL:      cfg.APIURL(),
+		apiUser:      cfg.APIUser,
+		apiKey:       cfg.APIKey,
+		username:     username,
+		clientIP:     clientIP,
+		domainCacheTTL: cfg.DomainCacheTTL,
+		hostsCacheTTL:  cfg.HostsCacheTTL,
+		hostsCache:     make(map[string]cachedHosts),
 	}
 }
 
@@ -196,6 +227,14 @@ func (c *NamecheapClient) fetchTLDList() error {
 }
 
 func (c *NamecheapClient) GetDomains() ([]Domain, error) {
+	c.mu.RLock()
+	cached := c.domains
+	c.mu.RUnlock()
+
+	if cached.isValid() {
+		return cached.entries, nil
+	}
+
 	params := url.Values{}
 	params.Set("Page", "1")
 	params.Set("PageSize", "100")
@@ -211,10 +250,27 @@ func (c *NamecheapClient) GetDomains() ([]Domain, error) {
 		return nil, fmt.Errorf("failed to parse domains list: %w", err)
 	}
 
+	c.mu.Lock()
+	c.domains = cachedDomains{
+		entries: domainsList.Result.Domains,
+		expiry:  time.Now().Add(c.domainCacheTTL),
+	}
+	c.mu.Unlock()
+
 	return domainsList.Result.Domains, nil
 }
 
 func (c *NamecheapClient) GetHosts(sld, tld string) ([]Host, error) {
+	cacheKey := sld + "." + tld
+
+	c.mu.RLock()
+	cached, ok := c.hostsCache[cacheKey]
+	c.mu.RUnlock()
+
+	if ok && cached.isValid() {
+		return cached.entries, nil
+	}
+
 	params := url.Values{}
 	params.Set("SLD", sld)
 	params.Set("TLD", tld)
@@ -229,10 +285,21 @@ func (c *NamecheapClient) GetHosts(sld, tld string) ([]Host, error) {
 		return nil, fmt.Errorf("failed to parse hosts for %s.%s: %w", sld, tld, err)
 	}
 
+	c.mu.Lock()
+	c.hostsCache[cacheKey] = cachedHosts{
+		entries: hostsResult.Result.Hosts,
+		expiry:  time.Now().Add(c.hostsCacheTTL),
+	}
+	c.mu.Unlock()
+
 	return hostsResult.Result.Hosts, nil
 }
 
 func (c *NamecheapClient) SetHosts(sld, tld string, hosts []Host) error {
+	c.mu.Lock()
+	delete(c.hostsCache, sld+"."+tld)
+	c.mu.Unlock()
+
 	params := url.Values{}
 	params.Set("SLD", sld)
 	params.Set("TLD", tld)
@@ -265,6 +332,12 @@ func (c *NamecheapClient) SetHosts(sld, tld string, hosts []Host) error {
 	}
 
 	return nil
+}
+
+func (c *NamecheapClient) InvalidateHostsCache(sld, tld string) {
+	c.mu.Lock()
+	delete(c.hostsCache, sld+"."+tld)
+	c.mu.Unlock()
 }
 
 func (c *NamecheapClient) makeRequest(command string, params url.Values) (*ApiResponse, error) {

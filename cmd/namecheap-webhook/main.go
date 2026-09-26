@@ -29,6 +29,8 @@ func main() {
 	log.Printf("API URL: %s", cfg.APIURL())
 	log.Printf("Webhook listen address: %s", cfg.ListenAddr)
 	log.Printf("Healthz listen address: %s", cfg.HealthzAddr)
+	log.Printf("Domain cache TTL: %s", cfg.DomainCacheTTL)
+	log.Printf("Hosts cache TTL: %s", cfg.HostsCacheTTL)
 
 	server, err := webhook.NewServer(cfg)
 	if err != nil {

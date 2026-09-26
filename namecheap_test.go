@@ -14,19 +14,20 @@ import (
 func newTestClient(t *testing.T, server *httptest.Server) *NamecheapClient {
 	t.Helper()
 	return &NamecheapClient{
-		httpClient: &http.Client{Timeout: 5 * time.Second},
-		baseURL:    server.URL,
-		apiUser:    "testuser",
-		apiKey:     "testkey",
-		username:   "testuser",
-		clientIP:   "1.2.3.4",
-		tlds:       []string{"com", "co.uk", "net", "org"},
+		httpClient:      &http.Client{Timeout: 5 * time.Second},
+		baseURL:         server.URL,
+		apiUser:         "testuser",
+		apiKey:          "testkey",
+		username:        "testuser",
+		clientIP:        "1.2.3.4",
+		tlds:            []string{"com", "co.uk", "net", "org"},
 		tldSet: map[string]bool{
 			"com":   true,
 			"co.uk": true,
 			"net":   true,
 			"org":   true,
 		},
+		hostsCache: make(map[string]cachedHosts),
 	}
 }
 
@@ -429,5 +430,195 @@ func TestXMLParsing_NcErrors(t *testing.T) {
 	errMsg := errors.Error()
 	if !strings.Contains(errMsg, "1010101") || !strings.Contains(errMsg, "1011102") {
 		t.Errorf("expected error message to contain both error numbers, got: %s", errMsg)
+	}
+}
+
+func TestNamecheapClient_GetDomainsCaching(t *testing.T) {
+	xmlDomainsResponse := `<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <CommandResponse Type="namecheap.domains.getList">
+    <DomainGetListResult>
+      <Domain ID="1" Name="example.com" User="testuser" Created="01/01/2020" Expires="01/01/2025" IsExpired="false" IsLocked="false" AutoRenew="false" WhoisGuard="ENABLED" IsPremium="false" IsOurDNS="true"/>
+    </DomainGetListResult>
+    <Paging>
+      <TotalItems>1</TotalItems>
+      <CurrentPage>1</CurrentPage>
+      <PageSize>100</PageSize>
+    </Paging>
+  </CommandResponse>
+  <Server>TestServer</Server>
+  <GMTTimeDifference>+0</GMTTimeDifference>
+  <ExecutionTime>0.1</ExecutionTime>
+</ApiResponse>`
+
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "text/xml")
+		_, _ = fmt.Fprint(w, xmlDomainsResponse)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	client.domainCacheTTL = 5 * time.Minute
+
+	domains1, err := client.GetDomains()
+	if err != nil {
+		t.Fatalf("first GetDomains failed: %v", err)
+	}
+	if len(domains1) != 1 {
+		t.Fatalf("expected 1 domain, got %d", len(domains1))
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected 1 API request, got %d", requestCount)
+	}
+
+	domains2, err := client.GetDomains()
+	if err != nil {
+		t.Fatalf("second GetDomains failed: %v", err)
+	}
+	if len(domains2) != 1 {
+		t.Fatalf("expected 1 domain on second call, got %d", len(domains2))
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected cache hit (still 1 request), got %d", requestCount)
+	}
+}
+
+func TestNamecheapClient_GetHostsCaching(t *testing.T) {
+	xmlHostsResponse := `<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <CommandResponse Type="namecheap.domains.dns.getHosts">
+    <DomainDNSGetHostsResult Domain="example.com" IsUsingOurDNS="true">
+      <host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
+      <host HostId="2" Name="www" Type="A" Address="5.6.7.8" MXPref="10" TTL="1800" />
+    </DomainDNSGetHostsResult>
+  </CommandResponse>
+  <Server>TestServer</Server>
+  <GMTTimeDifference>+0</GMTTimeDifference>
+  <ExecutionTime>0.1</ExecutionTime>
+</ApiResponse>`
+
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "text/xml")
+		_, _ = fmt.Fprint(w, xmlHostsResponse)
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	client.hostsCacheTTL = 5 * time.Minute
+
+	hosts1, err := client.GetHosts("example", "com")
+	if err != nil {
+		t.Fatalf("first GetHosts failed: %v", err)
+	}
+	if len(hosts1) != 2 {
+		t.Fatalf("expected 2 hosts, got %d", len(hosts1))
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected 1 API request, got %d", requestCount)
+	}
+
+	hosts2, err := client.GetHosts("example", "com")
+	if err != nil {
+		t.Fatalf("second GetHosts failed: %v", err)
+	}
+	if len(hosts2) != 2 {
+		t.Fatalf("expected 2 hosts on second call, got %d", len(hosts2))
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected cache hit (still 1 request), got %d", requestCount)
+	}
+
+	hosts3, err := client.GetHosts("other", "net")
+	if err != nil {
+		t.Fatalf("GetHosts for other domain failed: %v", err)
+	}
+	if len(hosts3) != 2 {
+		t.Fatalf("expected 2 hosts for other domain (same XML response), got %d", len(hosts3))
+	}
+	if requestCount != 2 {
+		t.Fatalf("expected 2 requests (different domain not cached), got %d", requestCount)
+	}
+}
+
+func TestNamecheapClient_CacheInvalidationOnSetHosts(t *testing.T) {
+	xmlHostsResponse := `<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <CommandResponse Type="namecheap.domains.dns.getHosts">
+    <DomainDNSGetHostsResult Domain="example.com" IsUsingOurDNS="true">
+      <host HostId="1" Name="@" Type="A" Address="1.2.3.4" MXPref="10" TTL="1800" />
+    </DomainDNSGetHostsResult>
+  </CommandResponse>
+  <Server>TestServer</Server>
+  <GMTTimeDifference>+0</GMTTimeDifference>
+  <ExecutionTime>0.1</ExecutionTime>
+</ApiResponse>`
+
+	xmlSetHostsResponse := `<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <CommandResponse Type="namecheap.domains.dns.setHosts">
+    <DomainDNSSetHostsResult Domain="example.com" IsSuccess="true" />
+  </CommandResponse>
+  <Server>TestServer</Server>
+  <GMTTimeDifference>+0</GMTTimeDifference>
+  <ExecutionTime>0.1</ExecutionTime>
+</ApiResponse>`
+
+	requestCount := 0
+	var lastCommand string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		lastCommand = r.URL.Query().Get("Command")
+		w.Header().Set("Content-Type", "text/xml")
+		if lastCommand == "namecheap.domains.dns.setHosts" {
+			_, _ = fmt.Fprint(w, xmlSetHostsResponse)
+		} else {
+			_, _ = fmt.Fprint(w, xmlHostsResponse)
+		}
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server)
+	client.hostsCacheTTL = 5 * time.Minute
+
+	_, err := client.GetHosts("example", "com")
+	if err != nil {
+		t.Fatalf("GetHosts failed: %v", err)
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected 1 request, got %d", requestCount)
+	}
+
+	_, err = client.GetHosts("example", "com")
+	if err != nil {
+		t.Fatalf("second GetHosts failed: %v", err)
+	}
+	if requestCount != 1 {
+		t.Fatalf("expected cache hit (still 1 request), got %d", requestCount)
+	}
+
+	err = client.SetHosts("example", "com", []Host{
+		{Name: "@", Type: "A", Address: "9.9.9.9", TTL: "1800"},
+	})
+	if err != nil {
+		t.Fatalf("SetHosts failed: %v", err)
+	}
+	if requestCount != 2 {
+		t.Fatalf("expected 2 requests after SetHosts, got %d", requestCount)
+	}
+
+	_, err = client.GetHosts("example", "com")
+	if err != nil {
+		t.Fatalf("third GetHosts failed: %v", err)
+	}
+	if requestCount != 3 {
+		t.Fatalf("expected 3 requests after cache invalidation, got %d", requestCount)
 	}
 }

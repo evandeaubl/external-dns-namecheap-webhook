@@ -199,7 +199,7 @@ func (c *NamecheapClient) Init() error {
 }
 
 func (c *NamecheapClient) fetchTLDList() error {
-	resp, err := c.makeRequest("namecheap.domains.getTldList", nil)
+	resp, err := c.makeRequest(http.MethodGet, "namecheap.domains.getTldList", nil)
 	if err != nil {
 		return fmt.Errorf("failed to fetch TLD list: %w", err)
 	}
@@ -240,7 +240,7 @@ func (c *NamecheapClient) GetDomains() ([]Domain, error) {
 	params.Set("PageSize", "100")
 	params.Set("SortBy", "NAME")
 
-	resp, err := c.makeRequest("namecheap.domains.getList", params)
+	resp, err := c.makeRequest(http.MethodGet, "namecheap.domains.getList", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domains: %w", err)
 	}
@@ -275,7 +275,7 @@ func (c *NamecheapClient) GetHosts(sld, tld string) ([]Host, error) {
 	params.Set("SLD", sld)
 	params.Set("TLD", tld)
 
-	resp, err := c.makeRequest("namecheap.domains.dns.getHosts", params)
+	resp, err := c.makeRequest(http.MethodGet, "namecheap.domains.dns.getHosts", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hosts for %s.%s: %w", sld, tld, err)
 	}
@@ -317,7 +317,7 @@ func (c *NamecheapClient) SetHosts(sld, tld string, hosts []Host) error {
 		}
 	}
 
-	resp, err := c.makeRequest("namecheap.domains.dns.setHosts", params)
+	resp, err := c.makeRequest(http.MethodPost, "namecheap.domains.dns.setHosts", params)
 	if err != nil {
 		return fmt.Errorf("failed to set hosts for %s.%s: %w", sld, tld, err)
 	}
@@ -340,7 +340,7 @@ func (c *NamecheapClient) InvalidateHostsCache(sld, tld string) {
 	c.mu.Unlock()
 }
 
-func (c *NamecheapClient) makeRequest(command string, params url.Values) (*ApiResponse, error) {
+func (c *NamecheapClient) makeRequest(method, command string, params url.Values) (*ApiResponse, error) {
 	if params == nil {
 		params = url.Values{}
 	}
@@ -354,9 +354,15 @@ func (c *NamecheapClient) makeRequest(command string, params url.Values) (*ApiRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse base URL: %w", err)
 	}
-	u.RawQuery = params.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	var req *http.Request
+	if method == http.MethodGet {
+		u.RawQuery = params.Encode()
+		req, err = http.NewRequest(http.MethodGet, u.String(), nil)
+	} else {
+		req, err = http.NewRequest(http.MethodPost, u.String(), strings.NewReader(params.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

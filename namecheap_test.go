@@ -176,7 +176,12 @@ func TestNamecheapClient_GetHosts(t *testing.T) {
 func TestNamecheapClient_SetHosts(t *testing.T) {
 	var receivedParams url.Values
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedParams = r.URL.Query()
+		if r.Method == http.MethodPost {
+			_ = r.ParseForm()
+			receivedParams = r.PostForm
+		} else {
+			receivedParams = r.URL.Query()
+		}
 		w.Header().Set("Content-Type", "text/xml")
 		_, _ = fmt.Fprint(w, `<?xml version="1.0" encoding="utf-8"?>
 <ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
@@ -575,7 +580,12 @@ func TestNamecheapClient_CacheInvalidationOnSetHosts(t *testing.T) {
 	var lastCommand string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		lastCommand = r.URL.Query().Get("Command")
+		if r.Method == http.MethodPost {
+			_ = r.ParseForm()
+			lastCommand = r.PostForm.Get("Command")
+		} else {
+			lastCommand = r.URL.Query().Get("Command")
+		}
 		w.Header().Set("Content-Type", "text/xml")
 		if lastCommand == "namecheap.domains.dns.setHosts" {
 			_, _ = fmt.Fprint(w, xmlSetHostsResponse)

@@ -110,7 +110,9 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: alex2844/action-gh-changelog@v1
+        uses: mikepenz/release-changelog-builder-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag: ${{ github.ref_name }}
 

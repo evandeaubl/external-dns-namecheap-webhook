@@ -325,6 +325,7 @@ func (s *Server) applyChangesForDomain(ctx context.Context, domainName string, d
 		return fmt.Errorf("invalid domain name: %s", domainName)
 	}
 
+	s.client.InvalidateHostsCache(sld, tld)
 	currentHosts, err := s.client.GetHosts(sld, tld)
 	if err != nil {
 		return fmt.Errorf("failed to get current hosts: %w", err)
